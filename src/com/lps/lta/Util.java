@@ -1,9 +1,4 @@
 package com.lps.lta;
-import info.monitorenter.cpdetector.io.ASCIIDetector;
-import info.monitorenter.cpdetector.io.CodepageDetectorProxy;
-import info.monitorenter.cpdetector.io.JChardetFacade;
-import info.monitorenter.cpdetector.io.ParsingDetector;
-import info.monitorenter.cpdetector.io.UnicodeDetector;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
@@ -14,7 +9,6 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
-import java.nio.charset.Charset;
 import java.util.regex.Matcher;
 
 public class Util {
@@ -24,8 +18,7 @@ public class Util {
 	 * @param out
 	 * @param outEn
 	 */
-	public static void changFileCode(String in, String out, String outEn) {
-		String inEn = getFileCode(in);
+	public static void changFileCode(String in, String out,String inEn, String outEn) {
         String str = read(in, inEn);
         write(out, outEn, str);
     }   
@@ -41,7 +34,7 @@ public class Util {
 			BufferedReader in = new BufferedReader(new InputStreamReader(new FileInputStream(fileName), encoding));
 			String temp = "";
 			while ((temp = in.readLine()) != null) {
-				str += temp + "\n";
+				str += temp + System.getProperty("line.separator");
 			}
 			in.close();
 		} catch (Exception e) {
@@ -61,7 +54,11 @@ public class Util {
 	 */
 	private static void write(String fileName, String encoding, String str) {
 		try {
-			Writer out = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(fileName), encoding));
+			File f = new File(fileName);
+			if (!f.getParentFile().exists()) {
+				f.getParentFile().mkdirs();
+			}
+			Writer out = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(f), encoding));
 			out.write(str);
 			out.close();
 		} catch (Exception e) {
@@ -77,41 +74,6 @@ public class Util {
 		str = str.replaceAll("\\\\+", Matcher.quoteReplacement(File.separator));
 		str = str.replaceAll("/+", Matcher.quoteReplacement(File.separator));
 		return str;
-	}
-	/**
-	 * 获取文件的编码
-	 * @param filePath
-	 * @return
-	 */
-	@SuppressWarnings("deprecation")
-	public static String getFileCode(String filePath) {
-		CodepageDetectorProxy detector = CodepageDetectorProxy.getInstance();
-		detector.add(new ParsingDetector(false));
-		detector.add(JChardetFacade.getInstance());
-		detector.add(ASCIIDetector.getInstance());
-		detector.add(UnicodeDetector.getInstance());
-		Charset charset = null;
-		File f = new File(filePath);
-		try {
-			charset = detector.detectCodepage(f.toURL());
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-		if (charset != null) {
-			return charset.name();
-		}
-		return "";
-	}
-	/**
-	 * 判断文件是否为制定编码
-	 * @param filePath
-	 * @param en
-	 * @return
-	 */
-	public static boolean judgeFileCode(String filePath, String en) {
-		Charset charset = Charset.forName(getFileCode(filePath));
-		Charset charset2 = Charset.forName(en);
-		return charset.name().equalsIgnoreCase(charset2.name());
 	}
 	/**
 	 * utf8 转 utf8 bom
