@@ -1,14 +1,14 @@
 package com.lps.lta;
 
-import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
+import java.io.UnsupportedEncodingException;
 import java.io.Writer;
+import java.util.Arrays;
 import java.util.regex.Matcher;
 
 public class Util {
@@ -17,42 +17,57 @@ public class Util {
 	 * @param in
 	 * @param out
 	 * @param outEn
+	 * @throws Exception 
 	 */
-	public static void changFileCode(String in, String out,String inEn, String outEn) {
-        String str = read(in, inEn);
-        write(out, outEn, str);
-    }   
-	/**
-	 * 读文件
-	 * 
-	 * @param fileName
-	 * @param encoding
-	 */
-	private static String read(String fileName, String encoding) {
-		String str = "";
+	public static boolean changFileCode(String in, String out, String outEn) {
 		try {
-			BufferedReader in = new BufferedReader(new InputStreamReader(new FileInputStream(fileName), encoding));
-			String temp = "";
-			while ((temp = in.readLine()) != null) {
-				str += temp + System.getProperty("line.separator");
+			byte[] bs = read(in);
+			String inEn = isUtf8(bs) ? "utf-8" : "gbk";
+			if ("gbk".equals(outEn)) {
+				if ("utf-8".equals(inEn)) {
+					bs = utf8(bs, false);
+				}
+				write(out, "gbk", new String(bs, inEn));
+			} else if ("utf8".equals(outEn)) {
+				if ("utf-8".equals(inEn)) {
+					bs = utf8(bs, false);
+				}
+				write(out, "utf-8", new String(bs, inEn));
+			} else if ("utf8bom".equals(outEn)) {
+				if ("gbk".equals(inEn)) {
+					bs = new String(bs, "gbk").getBytes("utf-8");
+				}
+				bs = utf8(bs, true);
+				write(out, "utf-8", new String(bs, "utf-8"));
 			}
-			in.close();
 		} catch (Exception e) {
 			e.printStackTrace();
+			return false;
 		}
-		return str;
+		return true;
+    }
+	/**
+	 * 读文件
+	 * @param fileName
+	 * @param encoding
+	 * @throws Exception 
+	 */
+	public static byte[] read(String fileName) throws Exception {
+		File file = new File(fileName);
+		InputStream in = new FileInputStream(file);
+		byte[] bs = new byte[in.available()];
+		in.read(bs);
+		in.close();
+		return bs;
 	}
 
 	/**
 	 * 写文件
-	 * 
-	 * @param fileName
-	 *            新的文件名
-	 * @param encoding
-	 *            写出的文件的编码方式
+	 * @param fileName 新的文件名
+	 * @param encoding 写出的文件的编码方式
 	 * @param str
 	 */
-	private static void write(String fileName, String encoding, String str) {
+	public static void write(String fileName, String encoding, String str) {
 		try {
 			File f = new File(fileName);
 			if (!f.getParentFile().exists()) {
@@ -68,7 +83,6 @@ public class Util {
 	/**
 	 * 将路径中的"\\"和"/"等替换为系统的分隔符
 	 * @param str
-	 * @return
 	 */
 	public static String replace(String str) {
 		str = str.replaceAll("\\\\+", Matcher.quoteReplacement(File.separator));
@@ -76,68 +90,76 @@ public class Util {
 		return str;
 	}
 	/**
-	 * utf8 转 utf8 bom
-	 * @param in
-	 * @param out
-	 * @throws Exception
+	 * utf8 与 utf8 bom 互相转换
+	 * @param bs
+	 * @param useBom
 	 */
-	public static void utf8WithBom(String in, String out) {
-		try {
-			byte[] bom = {-17,-69,-65};
-			File file = new File(in);
-			InputStream is = new FileInputStream(file);
-			byte[] bs = new byte[is.available()];
-			is.read(bs);
-			is.close();
-			boolean flag = true;
-			if (bs.length > 3) {
-				if (bs[0] == bom[0] && bs[1] == bom[1] && bs[2] == bom[2]) {
-					flag = false;
-				}
+	public static byte[] utf8(byte[] bs, boolean useBom) {
+		byte[] bom = {-17,-69,-65};
+		boolean hasBom = false;
+		if (bs.length > 3) {
+			if (bs[0] == bom[0] && bs[1] == bom[1] && bs[2] == bom[2]) {
+				hasBom = true;
 			}
-			String content = "";
-			if (flag) {
-				content = new String(bom, "utf-8");
+		}
+		if (useBom) {
+			if (hasBom) {
+				return bs;
+			} else {
+				byte[] rs = new byte[bs.length + bom.length];
+				System.arraycopy(bom, 0, rs, 0, bom.length);
+				System.arraycopy(bs, 0, rs, bom.length, bs.length);
+				return rs;
 			}
-			content += new String(bs, "utf-8");
-			write(out, "utf-8", content);
-		} catch (Exception e) {
-			e.printStackTrace();
+		} else {
+			if (hasBom) {
+				byte[] rs = new byte[bs.length - bom.length];
+				System.arraycopy(bs, bom.length, rs, 0, bs.length - bom.length);
+				return rs;
+			} else {
+				return bs;
+			}
 		}
 	}
 	/**
-	 * utf8 bom 转 utf8
-	 * @param in
-	 * @param out
-	 * @throws Exception
+	 * 判断文件是否是utf8
+	 * @param bs
 	 */
-	public static void utf8WithoutBom(String in, String out) {
+	public static boolean isUtf8(byte[] bs) {
 		try {
-			byte[] bom = {-17,-69,-65};
-			File file = new File(in);
-			InputStream is = new FileInputStream(file);
-			byte[] bs = new byte[is.available()];
-			is.read(bs);
-			is.close();
-			boolean flag = false;
-			if (bs.length > 3) {
-				if (bs[0] == bom[0] && bs[1] == bom[1] && bs[2] == bom[2]) {
-					flag = true;
-				}
-			}
-			String content = "";
-			if (flag) {
-				byte[] temp = new byte[bs.length - 3];
-				for (int i = 3; i < bs.length; i++) {
-					temp[i-3] = bs[i];
-				}
-				content = new String(temp, "utf-8");
+			String str = new String(bs, "utf-8");
+			byte[] data = str.getBytes("utf-8");
+			if (Arrays.equals(bs, data)) {
+				return true;
 			} else {
-				content = new String(bs, "utf-8");
+				return false;
 			}
-			write(out, "utf-8", content);
-		} catch (Exception e) {
+		} catch (UnsupportedEncodingException e) {
 			e.printStackTrace();
+			return false;
 		}
+	}
+	/**
+	 * 判断文件是否是utf8
+	 * @param bs
+	 */
+	public static boolean isUtf82(byte[] bs) {
+		int ascN = 0;
+		for (int i = 0; i < bs.length; ) {
+			if (bs[i] > 0 && bs[i] < 128) {
+				i += 1;
+				ascN += 1;
+			} else if (i < bs.length - 1 && (bs[i] & 0xE0) == 0xC0 && (bs[i + 1] & 0xC0) == 0x80) {
+				i += 2;
+			} else if (i < bs.length - 2 && (bs[i] & 0xF0) == 0xE0 && (bs[i + 1] & 0xC0) == 0x80 && (bs[i + 2] & 0xC0) == 0x80) {
+				i += 3;
+			} else {
+				return false;
+			}
+		}
+		if (ascN == bs.length) {
+			return false;
+		}
+		return true;
 	}
 }

@@ -1,12 +1,12 @@
 package com.lps.lta;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.HashSet;
 import java.util.Set;
 
 public class Main {
 	public static String in;
-	public static String inEn;
 	public static String out;
 	public static String outEn;
 	public static Set<String> codes = new HashSet<String>();
@@ -16,47 +16,36 @@ public class Main {
 		codes.add("utf8bom");
 	}
 	public static void main(String[] args) {
-		if (args.length < 3) {
+		if (args.length < 2) {
 			System.out.println("请输入参数");
 			exit();
 		}
-		inEn = args[0];
-		outEn = args[1];
-		in = Util.replace(args[2]);
-		out = Util.replace(args.length >= 4 ? args[3] : args[2]);
-		checkEncode(inEn);
-		checkEncode(outEn);
-		if (inEn.equals(outEn)) {
-			System.out.println("读取编码与写入编码一样,不需要转换.");
-			exit();
+		if (args.length == 2) {
+			System.out.println("你没有设定文件输出路径,将覆盖原文件.是否继续?(yes)");
+			byte[] input = new byte[3];
+			try {
+				System.in.read(input, 0, 3);
+				if (!"yes".equals(new String(input))) {
+					exit();
+				}
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
 		}
+		outEn = args[0];
+		in = Util.replace(args[1]);
+		out = Util.replace(args.length >= 3 ? args[2] : args[1]);
+		checkEncode(outEn);
 		File file = new File(in);
 		listFile(file);
+		System.out.println("转换结束");
 	}
 	public static void listFile(File file) {
 		if(file.isFile()) {
 			String path = file.getPath();
 			String outPath = path.replace(in, out);
-			if ("gbk".equals(outEn)) {
-				if ("utf8".equals(inEn)) {
-					Util.changFileCode(path, outPath, "utf-8", "gbk");
-				} else if ("utf8bom".equals(inEn)) {
-					Util.utf8WithoutBom(path, outPath);
-					Util.changFileCode(outPath, outPath, "utf-8", "gbk");
-				}
-			} else if ("utf8".equals(outEn)) {
-				if ("gbk".equals(inEn)) {
-					Util.changFileCode(path, outPath, "gbk", "utf-8");
-				} else if ("utf8bom".equals(inEn)) {
-					Util.utf8WithoutBom(path, outPath);
-				}
-			} else if ("utf8bom".equals(outEn)) {
-				if ("gbk".equals(inEn)) {
-					Util.changFileCode(path, outPath, "gbk", "utf-8");
-					Util.utf8WithBom(outPath, outPath);
-				} else if ("utf8".equals(inEn)) {
-					Util.utf8WithBom(path, outPath);
-				}
+			if (!Util.changFileCode(path, outPath, outEn)) {
+				System.out.println(String.format("文件\"%s\"转换失败", path));
 			}
 		} else if(file.isDirectory()) {
 			File files[] = file.listFiles();
@@ -83,4 +72,3 @@ public class Main {
 		System.exit(1);
 	}
 }
-
